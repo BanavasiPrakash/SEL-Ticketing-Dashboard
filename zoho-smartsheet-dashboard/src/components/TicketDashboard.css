@@ -177,7 +177,7 @@
 
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 15px;
   max-width: 1400px;
   margin: auto;
@@ -328,7 +328,7 @@
 }
 
 
-@keyframes glowShadow {
+/* @keyframes glowShadow {
   0%, 100% {
     box-shadow:
       3px 3px 9px rgba(0, 51, 153, 0.6),
@@ -343,9 +343,31 @@
       -4px -4px 14px rgba(255, 255, 255, 1),
       inset 4px 4px 10px rgba(255, 255, 255, 1),
       inset -4px -4px 10px rgba(0, 76, 255, 0.6),
-      0 0 12px rgba(120, 140, 255, 0.9);
+      0 0 1px rgba(120, 140, 255, 0.9);
+  } */
+
+  @keyframes glowShadow {
+  0%, 100% {
+    box-shadow:
+      3px 3px 9px rgba(204, 0, 255, 0.7),      /* magenta */
+      -3px -3px 9px rgba(0, 255, 255, 0.6),    /* cyan */
+      inset 2px 2px 6px rgba(255, 220, 50, 0.7), /* yellow */
+      inset -2px -2px 6px rgba(55, 125, 255, 0.6), /* blue */
+      0 0 8px rgba(255, 65, 120, 0.7);         /* pink */
+  }
+  50% {
+    box-shadow:
+      4px 4px 14px rgba(0, 255, 255, 0.8),     /* cyan */
+      -4px -4px 14px rgba(255, 50, 220, 0.9),  /* magenta-pink swap */
+      inset 4px 4px 10px rgba(255, 220, 50, 1),/* yellow */
+      inset -4px -4px 10px rgba(255, 0, 122, 0.7), /* bright pink */
+      0 0 12px rgba(255, 255, 0, 0.6);         /* yellow edge glow */
   }
 }
+
+
+
+
 
 .open {
   border-top: 4px solid #4CAF50;
@@ -544,4 +566,169 @@ Hamburger button style
   box-shadow: 0 1.5px 8px #d4383860, 0 2px 12px #fc828230;
   margin-left: 8px;
   gap: 8px;
+}
+
+
+.spinning-icon {
+  animation: spin 1s linear infinite;
+  font-size: 40px; /* or your preferred size */
+  color: white /* or your preferred color */
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(3, auto);
+  gap: 18px;
+  max-width: 1400px;
+  margin: 40px auto 0 auto;
+  padding: 32px;
+  border-radius: 40px;
+  background: none;
+}
+
+
+/* 3D, neon, flowing red border effect for each card! */
+.grid-cell {
+  position: relative;
+  background: #07090d;
+  border-radius: 26px;
+  min-height: 120px;
+  box-shadow: 
+    0 3px 22px #cf1645a6,
+    0 5px 64px #000b inset;
+  overflow: hidden;
+  transition: transform 0.38s cubic-bezier(0.23, .32, .53, 1.2);
+  z-index: 1;
+}
+.grid-cell:hover {
+  transform: scale(1.08) rotateY(10deg);
+  box-shadow: 0 0 44px #f82e50, 0 0 88px #ff0d2e50, 0 7px 64px #000b inset;
+  z-index: 3;
+}
+
+/* Flowing animated red neon border using ::after and @keyframes */
+.grid-cell::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: 26px;
+  padding: 2.1px;
+  background: conic-gradient(
+    from 0deg,
+    #ff1844, #ff1844 12%,
+    #ff7350 28%,
+    #ff2d2d 38%, 
+    #db178f 53%,
+    #cf1844 74%, 
+    #ff1844 100%
+  );
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: 2;
+  animation: borderFlow 2.8s linear infinite;
+}
+@keyframes borderFlow {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+/* Remove the white/button backgrounds for inner numbers */
+.count-box {
+  background: #11141c;
+  box-shadow: 0 0 14px #e11c21a1, 0 1.5px 8px #b3274360 inset;
+  border: none;
+  border-radius: 14px;
+  color: #ff4177;
+  font-weight: 900;
+  font-size: 55px;
+  margin: 7px 33px 0 33px;
+  padding: 2px 0;
+  transition: background 0.25s, box-shadow 0.3s;
+  text-shadow: 0 0 14px #ff185490;
+}
+
+.grid-cell .candidate-name {
+  color: #f7bfd7;
+  text-shadow: 0 0 17px #ff418c55, 0 1px 16px #19191980;
+  font-family: 'Montserrat', 'Poppins', sans-serif;
+  font-size: 19px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.8px;
+}
+
+.ticket-counts {
+  background: none;
+  border: none;
+  box-shadow: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+}
+
+.grid-cell:hover .count-box {
+  background: #2f1123;
+  color: #ffb7cc;
+  box-shadow: 0 2px 14px #ff418c90;
+}
+.candidate-name {
+  color: white;                /* Pure white */
+  font-family: 'Montserrat', 'Poppins', sans-serif;
+  font-size: 19px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.8px;
+  font-weight: 900;
+  text-shadow: 0 0 10px #111, 0 1px 8px #19191990;  /* Subtle glow for legibility */
+}
+
+
+.glowing-border {
+  position: relative;
+  border-radius: 16px;
+  padding: 20px;
+  background: #111;
+  z-index: 0;
+}
+
+.glowing-border::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  z-index: -1;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    magenta,
+    cyan,
+    yellow,
+    blue,
+    pink,
+    magenta
+  );
+  animation: rotate360 3s linear infinite;
+}
+
+@keyframes rotate360 {
+  0% {
+    transform: rotate(0turn);
+  }
+  100% {
+    transform: rotate(1turn);
+  }
 }

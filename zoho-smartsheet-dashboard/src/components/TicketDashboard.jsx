@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import Select, { components } from "react-select";
-import { FaBars } from "react-icons/fa";
+import { FaBars, FaSpinner } from "react-icons/fa";
 import "./TicketDashboard.css";
 
 const ASSIGNEE_COL_ID = 4549002565209988;
@@ -10,9 +10,7 @@ const ESCALATED_STATUS_COL_ID = 1004;
 const UNASSIGNED_STATUS_COL_ID = 1005;
 const IN_PROGRESS_STATUS_COL_ID = 1006;
 
-// const backendurl = "http://localhost:5000"
-const backendurl = "http://192.168.3.8:86"
-
+const backendurl = "http://localhost:5000";
 const CANDIDATES_PER_PAGE = 18;
 
 const Option = (props) => (
@@ -66,7 +64,6 @@ async function fetchZohoDataFromBackend(
     if (!response.ok)
       throw new Error("Failed to fetch Zoho assignee ticket counts");
     const data = await response.json();
-
     const rows = data.members.map((member) => ({
       cells: [
         { columnId: ASSIGNEE_COL_ID, value: member.name },
@@ -78,10 +75,10 @@ async function fetchZohoDataFromBackend(
       ],
       latestUnassignedTicketId: member.latestUnassignedTicketId || null,
     }));
-
     setRows(rows);
     setUnassignedTicketNumbers(data.unassignedTicketNumbers || []);
     localStorage.setItem("ticketDashboardRows", JSON.stringify(rows));
+    localStorage.setItem("ticketDashboardUnassignedNumbers", JSON.stringify(data.unassignedTicketNumbers || []));
     setError(null);
   } catch (error) {
     setError(error.message);
@@ -89,6 +86,7 @@ async function fetchZohoDataFromBackend(
 }
 
 function TicketDashboard() {
+  const hasFetchedRef = useRef(false);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -99,16 +97,18 @@ function TicketDashboard() {
   const [openSum, setOpenSum] = useState(0);
   const [holdSum, setHoldSum] = useState(0);
   const [escalatedSum, setEscalatedSum] = useState(0);
-  const [unassignedSum, setUnassignedSum] = useState(0);
   const [inProgressSum, setInProgressSum] = useState(0);
+  const [globalUnassignedSum, setGlobalUnassignedSum] = useState(0);
+
   const [filteredCandidates, setFilteredCandidates] = useState([]);
   const [gridCells, setGridCells] = useState([]);
-  const [filtersVisible, setFiltersVisible] = useState(true);
+  const [filtersVisible, setFiltersVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [unassignedTicketNumbers, setUnassignedTicketNumbers] = useState([]);
   const [currentUnassignedIndex, setCurrentUnassignedIndex] = useState(0);
 
-  const prevUnassignedCountRef = useRef(unassignedSum);
+  const prevUnassignedCountRef = useRef(globalUnassignedSum);
   const [popupContent, setPopupContent] = useState("");
   const [showPopup] = useState(true);
 
@@ -123,11 +123,55 @@ function TicketDashboard() {
     { value: "total", label: "Total" },
   ];
 
+  async function refreshData() {
+    try {
+      setLoading(true);
+      await fetchZohoDataFromBackend(setRows, setError, setUnassignedTicketNumbers);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+useEffect(() => {
+  // Restore previous rows instantly
+  const savedRows = localStorage.getItem("ticketDashboardRows");
+  if (savedRows) {
+    setRows(JSON.parse(savedRows));
+  }
+  // Restore previous unassigned ticket numbers instantly
+  const savedTicketNumbers = localStorage.getItem("ticketDashboardUnassignedNumbers");
+  if (savedTicketNumbers) {
+    const numbers = JSON.parse(savedTicketNumbers);
+    setUnassignedTicketNumbers(numbers);
+    if (numbers.length > 0) {
+      setCurrentUnassignedIndex(0); // show first ticket instantly
+    }
+  }
+
+  if (!hasFetchedRef.current) {
+    refreshData();
+    hasFetchedRef.current = true;
+  }
+  const dataInterval = setInterval(() => { refreshData(); }, 300000);
+  const reloadInterval = setInterval(() => { window.location.reload(); }, 300000);
+  return () => {
+    clearInterval(dataInterval);
+    clearInterval(reloadInterval);
+  };
+}, []);
+
+
+
   useEffect(() => {
-    const cachedRows = localStorage.getItem("ticketDashboardRows");
-    if (cachedRows) setRows(JSON.parse(cachedRows));
-    fetchZohoDataFromBackend(setRows, setError, setUnassignedTicketNumbers);
-  }, []);
+    let total = 0;
+    rows.forEach((row) => {
+      const cell = row.cells.find((cell) => cell.columnId === UNASSIGNED_STATUS_COL_ID);
+      if (cell) total += Number(cell.value || 0);
+    });
+    setGlobalUnassignedSum(total);
+  }, [rows]);
 
   useEffect(() => {
     if (unassignedTicketNumbers.length > 0) {
@@ -141,14 +185,20 @@ function TicketDashboard() {
   const nonZeroRows = useMemo(() => rows, [rows]);
 
   const candidateOptions = useMemo(() => {
-    const setNames = new Set();
+    const validNames = [];
     nonZeroRows.forEach((row) => {
       const name = row.cells.find((c) => c.columnId === ASSIGNEE_COL_ID)?.value?.trim();
-      if (name) setNames.add(name);
+      const ticketCounts = row.cells
+        .filter(cell =>
+          [OPEN_STATUS_COL_ID, HOLD_STATUS_COL_ID, ESCALATED_STATUS_COL_ID, UNASSIGNED_STATUS_COL_ID, IN_PROGRESS_STATUS_COL_ID].includes(cell.columnId))
+        .map(cell => Number(cell.value) || 0);
+      if (name && ticketCounts.some(count => count > 0)) {
+        validNames.push(name);
+      }
     });
-    return Array.from(setNames)
+    return Array.from(new Set(validNames))
       .sort()
-      .map((name) => ({ value: name, label: name }));
+      .map(name => ({ value: name, label: name }));
   }, [nonZeroRows]);
 
   const selectedStatusKeys = useMemo(
@@ -224,17 +274,11 @@ function TicketDashboard() {
     setOpenSum(sums.open);
     setHoldSum(sums.hold);
     setEscalatedSum(sums.escalated);
-    setUnassignedSum(sums.unassigned);
     setInProgressSum(sums.inProgress);
-
     setFilteredCandidates(Object.entries(candidateCountMap));
     setCurrentPage(1);
   }, [
-    nonZeroRows,
-    searchTerm,
-    selectedCandidates,
-    selectedStatuses,
-    selectedStatusKeys,
+    nonZeroRows, searchTerm, selectedCandidates, selectedStatuses, selectedStatusKeys,
   ]);
 
   useEffect(() => {
@@ -268,22 +312,14 @@ function TicketDashboard() {
         (k) => k !== "total"
       );
       const sumSelectedStatuses = selectedStatusesExcludingTotal.reduce(
-        (sum, key) => sum + (counts[key] || 0),
-        0
+        (sum, key) => sum + (counts[key] || 0), 0
       );
       const showSumOnly = totalSelected && selectedStatusesExcludingTotal.length > 0;
 
       cells.push(
-        <div
-          key={candidate}
-          className="grid-cell"
-          style={{ animationDelay: `${(i - start) * 65}ms` }}
-        >
+        <div key={candidate} className="grid-cell" style={{ animationDelay: `${(i - start) * 65}ms` }}>
           <div className="candidate-name">{candidate}</div>
-          <div
-            className="ticket-counts"
-            style={{ justifyContent: "center", display: "flex", gap: 10 }}
-          >
+          <div className="ticket-counts" style={{ justifyContent: "center", display: "flex", gap: 10 }}>
             {showSumOnly ? (
               <div className="count-box total">{sumSelectedStatuses}</div>
             ) : selectedStatusesExcludingTotal.length > 0 ? (
@@ -301,23 +337,17 @@ function TicketDashboard() {
                   <div className="count-box escalated">{counts.escalated}</div>
                 )}
                 {selectedStatusKeys.includes("unassigned") && (
-                  <div
-                    className="count-box unassigned"
-                    style={{
-                      backgroundColor:
-                        counts.latestUnassignedTicketId === unassignedTicketNumbers[currentUnassignedIndex]
-                          ? "#ffd700"
-                          : "#ff6666",
-                      color:
-                        counts.latestUnassignedTicketId === unassignedTicketNumbers[currentUnassignedIndex]
-                          ? "#34495e"
-                          : "#fff",
-                      fontWeight:
-                        counts.latestUnassignedTicketId === unassignedTicketNumbers[currentUnassignedIndex]
-                          ? 900
-                          : 700,
-                    }}
-                  >
+                  <div className="count-box unassigned" style={{
+                    backgroundColor:
+                      counts.latestUnassignedTicketId === unassignedTicketNumbers[currentUnassignedIndex]
+                        ? "#ffd700" : "#ff6666",
+                    color:
+                      counts.latestUnassignedTicketId === unassignedTicketNumbers[currentUnassignedIndex]
+                        ? "#34495e" : "#fff",
+                    fontWeight:
+                      counts.latestUnassignedTicketId === unassignedTicketNumbers[currentUnassignedIndex]
+                        ? 900 : 700,
+                  }}>
                     {counts.unassigned}
                   </div>
                 )}
@@ -335,20 +365,15 @@ function TicketDashboard() {
         </div>
       );
     }
-
     setGridCells(cells);
   }, [
-    filteredCandidates,
-    currentPage,
-    sortOrder,
-    selectedStatusKeys,
-    unassignedTicketNumbers,
-    currentUnassignedIndex,
+    filteredCandidates, currentPage, sortOrder, selectedStatusKeys,
+    unassignedTicketNumbers, currentUnassignedIndex,
   ]);
 
   useEffect(() => {
-    prevUnassignedCountRef.current = unassignedSum;
-  }, [unassignedSum]);
+    prevUnassignedCountRef.current = globalUnassignedSum;
+  }, [globalUnassignedSum]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -358,13 +383,10 @@ function TicketDashboard() {
         setCurrentPage((prev) => (prev < totalPages ? prev + 1 : 1));
       }, 10000);
     }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [filteredCandidates]);
 
   const showLegendTotal = selectedStatuses.some((s) => s.value === "total");
-
   const currentTicketNumber =
     unassignedTicketNumbers.length > 0
       ? unassignedTicketNumbers[currentUnassignedIndex]
@@ -372,145 +394,66 @@ function TicketDashboard() {
 
   return (
     <>
-      <div
-        className="dashboard-header-main"
-        style={{ maxWidth: 1300, margin: "0 auto 30px auto", position: "relative" }}
-      >
-        <div
-          className="dashboard-header-top"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            position: "relative",
-          }}
-        >
-          <img
-            className="header-image"
-            src="/suprajit_logo_BG.png"
-            alt="Left icon"
-            style={{ height: 80, width: "auto" }}
-          />
-          <div
-            className="dashboard-title-container"
-            style={{
-              fontWeight: 900,
-              fontSize: 60,
-              letterSpacing: 2,
-              color: "#e0eaff",
-              textShadow: "2px 2px 6px rgba(0, 0, 50, 0.7)",
-              userSelect: "none",
-              textTransform: "uppercase",
-              position: "relative",
-              zIndex: 2,
-            }}
-          >
+      <div className="dashboard-header-main" style={{ maxWidth: 1300, margin: "0 auto 30px auto", position: "relative" }}>
+        <div className="dashboard-header-top" style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative",
+        }}>
+          <img className="header-image" src="/suprajit_logo_BG.png" alt="Left icon" style={{ height: 80, width: "auto" }} />
+          <div className="dashboard-title-container" style={{
+            fontWeight: 900, fontSize: 60, letterSpacing: 2, color: "#e0eaff",
+            textShadow: "2px 2px 6px rgba(0, 0, 50, 0.7)",
+            userSelect: "none", textTransform: "uppercase", position: "relative", zIndex: 2,
+          }}>
             TICKET DASHBOARD
           </div>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: 10,
-              position: "relative",
-              zIndex: 2,
-            }}
-          >
-            <img
-              className="header-image"
-              src="/IT-LOGO.png"
-              alt="Right icon"
-              style={{ height: 70, width: "auto" }}
-            />
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, position: "relative", zIndex: 2,
+          }}>
+            <img className="header-image" src="/IT-LOGO.png" alt="Right icon" style={{ height: 70, width: "auto" }} />
           </div>
         </div>
-
-        <div
-          className="dashboard-header-filters"
-          style={{
-            maxWidth: 1400,
-            margin: "0 auto",
-            display: "flex",
-            alignItems: "center",
-            width: "100%",
-            justifyContent: "space-between",
-          }}
-        >
-          <div
-            className="legend-bar"
-            style={{
-              display: "flex",
-              gap: 10,
-              flex: filtersVisible ? "initial" : 1,
-              transition: "flex 0.3s ease",
-            }}
-          >
-            <div
-              className="legend-item open"
-              style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}
-            >
-              OPEN{" "}
-              <span style={{ fontWeight: 900, marginLeft: 4 }}>
-                {openSum.toString().padStart(3, "0")}
-              </span>
+        <div className="dashboard-header-filters" style={{
+          maxWidth: 1400, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
+        }}>
+          <div className="legend-bar" style={{
+            display: "flex", gap: 10, flex: filtersVisible ? "initial" : 1, transition: "flex 0.3s ease",
+          }}>
+            <div className="legend-item open" style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}>
+              OPEN <span style={{ fontWeight: 900, marginLeft: 4 }}>{openSum.toString().padStart(3, "0")}</span>
             </div>
-            <div
-              className="legend-item hold"
-              style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}
-            >
-              HOLD{" "}
-              <span style={{ fontWeight: 900, marginLeft: 4 }}>
-                {holdSum.toString().padStart(3, "0")}
-              </span>
+            <div className="legend-item hold" style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}>
+              HOLD <span style={{ fontWeight: 900, marginLeft: 4 }}>{holdSum.toString().padStart(3, "0")}</span>
             </div>
-            <div
-              className="legend-item inprogress"
-              style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}
-            >
-              IN PROGRESS{" "}
-              <span style={{ fontWeight: 900, marginLeft: 4 }}>
-                {inProgressSum.toString().padStart(3, "0")}
-              </span>
+            <div className="legend-item inprogress" style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}>
+              IN PROGRESS <span style={{ fontWeight: 900, marginLeft: 4 }}>{inProgressSum.toString().padStart(3, "0")}</span>
             </div>
-            <div
-              className="legend-item escalated"
-              style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}
-            >
-              ESCALATED{" "}
-              <span style={{ fontWeight: 900, marginLeft: 4 }}>
-                {escalatedSum.toString().padStart(3, "0")}
-              </span>
+            <div className="legend-item escalated" style={{ flex: 1, textAlign: "center", fontSize: 18, fontWeight: 900 }}>
+              ESCALATED <span style={{ fontWeight: 900, marginLeft: 4 }}>{escalatedSum.toString().padStart(3, "0")}</span>
             </div>
-
-            <div
-              className="unassigned-box-blink"
-              style={{
-                flex: 1,
-                textAlign: "center",
-                fontWeight: 900,
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              UNASSIGNED{" "}
-              <span>{unassignedSum.toString().padStart(3, "0")}</span>
+            <div className="unassigned-box-blink" style={{
+              flex: 1, textAlign: "center", fontWeight: 900, display: "flex", justifyContent: "center", alignItems: "center", gap: 12,
+            }}>
+              UNASSIGNED <span>{globalUnassignedSum.toString().padStart(3, "0")}</span>
               {rows.length > 0 && (
                 <span
                   style={{
                     padding: "5px 10px",
-                    backgroundColor: currentTicketNumber ===
+                    backgroundColor:
+                      currentTicketNumber ===
                       rows.find((r) => r.latestUnassignedTicketId)?.latestUnassignedTicketId
-                      ? "#ffd700"
-                      : "#ff6666",
+                        ? "#ffd700"
+                        : "#ff6666",
                     borderRadius: 16,
-                    color: currentTicketNumber ===
+                    color:
+                      currentTicketNumber ===
                       rows.find((r) => r.latestUnassignedTicketId)?.latestUnassignedTicketId
-                      ? "#34495e"
-                      : "#fff",
-                    fontWeight: 900,
+                        ? "#34495e"
+                        : "#fff",
+                    fontWeight:
+                      currentTicketNumber ===
+                      rows.find((r) => r.latestUnassignedTicketId)?.latestUnassignedTicketId
+                        ? 900
+                        : 700,
                     fontSize: 20,
                     userSelect: "none",
                     display: "inline-block",
@@ -521,36 +464,39 @@ function TicketDashboard() {
                 </span>
               )}
             </div>
-
             {showLegendTotal && (
-              <div
-                className="legend-item total"
-                style={{
-                  backgroundColor: "#ffd700",
-                  color: "#34495e",
-                  fontWeight: 700,
-                  borderRadius: 12,
-                  padding: "0 10px",
-                  flex: 1,
-                  textAlign: "center",
-                  fontSize: 22,
-                }}
-              >
-                TOTAL{" "}
-                <span>
+              <div className="legend-item total" style={{
+                backgroundColor: "#ffd700", color: "#34495e", fontWeight: 700, borderRadius: 12,
+                padding: "0 10px", flex: 1, textAlign: "center", fontSize: 22,
+              }}>
+                TOTAL <span>
                   {(
                     (selectedStatusKeys.includes("open") ? openSum : 0) +
                     (selectedStatusKeys.includes("hold") ? holdSum : 0) +
                     (selectedStatusKeys.includes("inProgress") ? inProgressSum : 0) +
                     (selectedStatusKeys.includes("escalated") ? escalatedSum : 0) +
-                    (selectedStatusKeys.includes("unassigned") ? unassignedSum : 0)
-                  )
-                    .toString()
-                    .padStart(3, "0")}
+                    (selectedStatusKeys.includes("unassigned") ? globalUnassignedSum : 0)
+                  ).toString().padStart(3, "0")}
                 </span>
               </div>
             )}
           </div>
+          <button
+            className="hamburger-btn"
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 10,
+              border: "none",
+              cursor: "pointer",
+              marginLeft: 20,
+              display: "block",
+            }}
+            onClick={() => setFiltersVisible((v) => !v)}
+            aria-label="Toggle filters"
+          >
+            <FaBars size={18} color="#34495e" />
+          </button>
 
           {filtersVisible && (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -563,7 +509,7 @@ function TicketDashboard() {
                   options={candidateOptions}
                   value={selectedCandidates}
                   onChange={setSelectedCandidates}
-                  placeholder="Search persons"
+                  placeholder="Search agents"
                   styles={selectStyles}
                   menuPortalTarget={document.body}
                   filterOption={personFilterOption}
@@ -596,24 +542,13 @@ function TicketDashboard() {
               </select>
             </div>
           )}
-
-          <button
-            className="hamburger-btn"
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 10,
-              border: "none",
-              cursor: "pointer",
-              marginLeft: 20,
-              display: "block",
-            }}
-            onClick={() => setFiltersVisible((v) => !v)}
-            aria-label="Toggle filters"
-          >
-            <FaBars size={18} color="#34495e" />
-          </button>
         </div>
+
+        {loading && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
+              <FaSpinner className="spinning-icon" />
+          </div>
+        )}
 
         <div
           className="grid-container"

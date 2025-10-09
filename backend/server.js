@@ -13,12 +13,12 @@ app.use(cors());
 // Content Security Policy header middleware
 app.use((req, res, next) => {
   res.setHeader(
-  "Content-Security-Policy",
-  "default-src 'self'; connect-src 'self' http://192.168.3.8:3000 http://192.168.3.8:70"
-);
-
+    "Content-Security-Policy",
+    "default-src 'self'; connect-src 'self' http://localhost:5000 http://127.0.0.1:5000 http://192.168.3.8:5000"
+  );
   next();
 });
+
 
 const clientId = "1000.VEPAX9T8TKDWJZZD95XT6NN52PRPQY";
 const clientSecret = "acca291b89430180ced19660cd28ad8ce1e4bec6e8";
@@ -133,11 +133,16 @@ const statusMap = {
 
 app.get("/api/zoho-assignees-with-ticket-counts", async (req, res) => {
   try {
+    console.log("Received request for /api/zoho-assignees-with-ticket-counts");
     const { departmentId, agentId } = req.query;
     const accessToken = await getAccessToken();
+    console.log("Access token obtained");
 
     let users = await fetchAllUsers(accessToken);
+    console.log(`Fetched users count: ${users.length}`);
+
     const tickets = await fetchAllTickets(accessToken, departmentId, agentId);
+    console.log(`Fetched tickets count: ${tickets.length}`);
 
     const allAssigneeIds = new Set(tickets.map((t) => t.assigneeId).filter(Boolean));
     const knownUserIds = new Set(users.map((u) => u.id));
@@ -146,6 +151,7 @@ app.get("/api/zoho-assignees-with-ticket-counts", async (req, res) => {
     if (missingUserIds.length > 0) {
       const missingUsers = await fetchUsersByIds(accessToken, missingUserIds);
       users = users.concat(missingUsers);
+      console.log(`Fetched missing users count: ${missingUsers.length}`);
     }
 
     const ticketStatusCountMap = {};
@@ -173,7 +179,6 @@ app.get("/api/zoho-assignees-with-ticket-counts", async (req, res) => {
     };
     latestUnassignedTicketIdMap["unassigned"] = null;
 
-    // Collect all unassigned ticket numbers here
     const allUnassignedTicketNumbers = [];
 
     tickets.forEach((ticket) => {
@@ -199,8 +204,16 @@ app.get("/api/zoho-assignees-with-ticket-counts", async (req, res) => {
         latestUnassignedTicketIdMap[assigneeId] = null;
       }
 
-      // Add all unassigned ticket numbers
-      if (isUnassignedAssignee || (ticket.status && ticket.status.toLowerCase() === "unassigned")) {
+      const rawStatus = (ticket.status || "").toLowerCase();
+      const normalizedStatus = statusMap[rawStatus] || "unassigned";
+
+      const isEscalated = ticket.isEscalated === true || String(ticket.escalated).toLowerCase() === "true";
+
+      // Only add if unassigned and NOT closed
+      if (
+        isUnassignedAssignee &&
+        normalizedStatus !== "closed"
+      ) {
         const ticketNumber = ticket.ticketNumber || ticket.id;
         if (ticketNumber) {
           allUnassignedTicketNumbers.push(ticketNumber);
@@ -214,11 +227,6 @@ app.get("/api/zoho-assignees-with-ticket-counts", async (req, res) => {
           latestUnassignedTicketIdMap[assigneeId] = ticketNumber;
         }
       }
-
-      const rawStatus = (ticket.status || "").toLowerCase();
-      const normalizedStatus = statusMap[rawStatus] || "unassigned";
-
-      const isEscalated = ticket.isEscalated === true || String(ticket.escalated).toLowerCase() === "true";
 
       // Skip closed tickets under unassigned
       if (isUnassignedAssignee && normalizedStatus === "closed") {
@@ -264,12 +272,14 @@ app.get("/api/zoho-assignees-with-ticket-counts", async (req, res) => {
         };
       });
 
+    console.log("Sending response with ticket counts");
     res.json({ members, unassignedTicketNumbers: allUnassignedTicketNumbers });
   } catch (error) {
     console.error("API error:", error.response?.data || error.message);
     res.status(500).json({ error: "Failed to fetch assignee ticket counts" });
   }
 });
+
 
 // Root route to handle / preventing 404
 app.get("/", (req, res) => {
@@ -279,4 +289,3 @@ app.get("/", (req, res) => {
 app.listen(port, '0.0.0.0', () => {
   console.log(`Backend server running on port ${port}`);
 });
-
