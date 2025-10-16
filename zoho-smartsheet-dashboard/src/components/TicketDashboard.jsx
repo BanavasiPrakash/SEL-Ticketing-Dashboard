@@ -11,7 +11,8 @@ const UNASSIGNED_STATUS_COL_ID = 1005;
 const IN_PROGRESS_STATUS_COL_ID = 1006;
 
 // const backendurl = "http://192.168.3.8:86";
-const backendurl = "https://ticket-backend-code.onrender.com"
+// const backendurl = "https://ticket-backend-code.onrender.com"
+const backendurl = "http://localhost:5000";
 const CANDIDATES_PER_PAGE = 15;
 
 const Option = (props) => (
@@ -398,14 +399,14 @@ function TicketDashboard() {
       }}>
         <img className="header-image" src="/suprajit_logo_BG.png" alt="Left icon" style={{ height: 80, width: "auto" }} />
         <div className="dashboard-title-container" style={{
-          fontWeight: 900, fontSize: 60, letterSpacing: 2, color: "#e0eaff",
+          fontWeight: 900, fontSize: 60, letterSpacing: 2, color: "#e0eaff",marginTop:60,
           textShadow: "2px 2px 6px rgba(0, 0, 50, 0.7)",
           userSelect: "none", textTransform: "uppercase", position: "relative", zIndex: 2,
         }}>
           TICKET DASHBOARD
         </div>
         <div style={{
-          display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10, position: "relative", zIndex: 2,
+          display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 30, position: "relative", zIndex: 2,
         }}>
           <img className="header-image" src="/IT-LOGO.png" alt="Right icon" style={{ height: 70, width: "auto" }} />
         </div>
@@ -414,7 +415,7 @@ function TicketDashboard() {
         maxWidth: 1400, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%",
       }}>
         <div className="legend-bar" style={{
-          display: "flex", gap: 10, flex: filtersVisible ? "initial" : 1, transition: "flex 0.3s ease",
+          display: "flex", gap: 10, flex: filtersVisible ? "initial" : 1, transition: "flex 0.3s ease",marginTop:20,
         }}>
           <div className="legend-item open" style={{ flex: 1, textAlign: "center", fontSize: 20, fontWeight: 900 }}>
             OPEN <span style={{ fontWeight: 900, marginLeft: 4 }}>{openSum.toString().padStart(3, "0")}</span>
@@ -479,6 +480,7 @@ function TicketDashboard() {
             border: "none",
             cursor: "pointer",
             marginLeft: 20,
+            marginTop:20,
             display: "block",
           }}
           onClick={() => setFiltersVisible((v) => !v)}
@@ -543,12 +545,12 @@ function TicketDashboard() {
       <div
         className="grid-container"
         style={{
-          marginTop: 30,
+          marginTop: 40,
           display: "grid",
           gap: "18px",
           gridTemplateColumns: "repeat(5, 1fr)", // 5 columns
           gridTemplateRows: "repeat(3, auto)",   // 3 rows
-          maxWidth: 1300,                       // Optional: reduce maxWidth for better fit
+          maxWidth: 10000,                       // Optional: reduce maxWidth for better fit
         }}
       >
         {gridCells}
