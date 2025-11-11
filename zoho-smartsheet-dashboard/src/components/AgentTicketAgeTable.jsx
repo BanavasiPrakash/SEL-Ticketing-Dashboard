@@ -2,24 +2,30 @@ import React, { useState } from 'react';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 
+// AgentTicketAgeTable component
 export default function AgentTicketAgeTable({
-  membersData,
-  onClose,
-  selectedAges = ["fifteenDays", "sixteenToThirty", "month"],
-  selectedStatuses = [],
-  showTimeDropdown,
-  selectedDepartmentId,
-  selectedAgentNames = []
+  membersData, // Array of agents with ticket data
+  onClose, // callback to close table on double click
+  selectedAges = ["fifteenDays", "sixteenToThirty", "month"], // Which age buckets to show
+  selectedStatuses = [], // Which ticket statuses to filter on (empty = all)
+  showTimeDropdown, // (unused here) for showing time filters
+  selectedDepartmentId, // Currently selected department for filtering agent ticket data
+  selectedAgentNames = [] // Filter to show only these agent names, or show all if empty
 }) {
+  // Track which table row is hovered for styling
   const [hoveredRowIndex, setHoveredRowIndex] = useState(null);
 
+  // Define the ticket age column info with keys and labels
   const ageColumns = [
     { key: "fifteenDays", label: "1-15 Days Tickets", ageProp: "BetweenOneAndFifteenDays" },
     { key: "sixteenToThirty", label: "16-30 Days Tickets", ageProp: "BetweenSixteenAndThirtyDays" },
     { key: "month", label: "30+ Days Tickets", ageProp: "OlderThanThirtyDays" }
   ];
 
+  // Filter age columns based on selected ages
   const visibleAgeColumns = ageColumns.filter(col => selectedAges.includes(col.key));
+
+  // Define the columns to show in the table including serial, agent name, total count and age columns
   const columnsToShow = [
     { key: "serial", label: "SI. NO." },
     { key: "name", label: "Agent Name" },
@@ -27,6 +33,7 @@ export default function AgentTicketAgeTable({
     ...visibleAgeColumns
   ];
 
+  // Color palette for status mini-boxes
   const statusPalette = {
     open: "#bd2331",
     hold: "#ffc107",
@@ -34,14 +41,17 @@ export default function AgentTicketAgeTable({
     escalated: "#ef6724"
   };
 
+  // Process selected statuses to extract status keys
   const statusKeys =
     selectedStatuses && selectedStatuses.length > 0
       ? selectedStatuses.map(st => st.value)
       : [];
 
+  // Build data rows based on membersData and filters
   const tableRows = (membersData || [])
     .filter(agent => {
       if (selectedDepartmentId) {
+        // Filter by department ticket counts and optionally filtered agent names
         const agentHasTickets =
           (agent.departmentTicketCounts?.[selectedDepartmentId] || 0) > 0 ||
           Object.values(agent.departmentAgingCounts?.[selectedDepartmentId] || {}).some(v => v > 0);
@@ -50,11 +60,13 @@ export default function AgentTicketAgeTable({
           selectedAgentNames.includes(agent.name.trim());
         return agentHasTickets && nameMatch;
       } else {
+        // If no department selected, filter only agents with any tickets
         const t = agent.tickets || {};
         return (t.open || 0) + (t.hold || 0) + (t.escalated || 0) + (t.unassigned || 0) + (t.inProgress || 0) > 0;
       }
     })
     .map(agent => {
+      // Prepare aging counts for the respective department or overall tickets
       let agingCounts = {};
       if (selectedDepartmentId) {
         agingCounts = agent.departmentAgingCounts?.[selectedDepartmentId] || {};
@@ -69,6 +81,7 @@ export default function AgentTicketAgeTable({
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Styles for cells and headers with 3D effects and hover effects
   const cellStyle3D = {
     padding: 14,
     fontWeight: 700,
@@ -118,6 +131,7 @@ export default function AgentTicketAgeTable({
     zIndex: 2,
   };
 
+  // Style function for mini colored boxes representing statuses
   const miniBoxStyle = color => ({
     background: "#232c48",
     borderRadius: 18,
@@ -135,6 +149,7 @@ export default function AgentTicketAgeTable({
     borderTop: `5px solid ${color}`
   });
 
+  // Add double click handler to trigger onClose callback
   React.useEffect(() => {
     const handleDoubleClick = () => {
       if (onClose) onClose();
@@ -143,6 +158,8 @@ export default function AgentTicketAgeTable({
     return () => window.removeEventListener('dblclick', handleDoubleClick);
   }, [onClose]);
 
+  // Aggregates ticket number arrays for an agent, age bucket and status,
+  // optionally across all departments if none selected
   function aggregateTickets(agent, ageProp, status) {
     if (!selectedDepartmentId && agent.departmentAgingCounts) {
       return Object.values(agent.departmentAgingCounts).flatMap(age =>
@@ -154,10 +171,12 @@ export default function AgentTicketAgeTable({
       : [];
   }
 
+  // Count the number of tickets from the aggregated arrays for badge display
   function countFromArray(agent, ageProp, status) {
     return aggregateTickets(agent, ageProp, status).length;
   }
 
+  // Render table with headers and ticket counts; tooltips show ticket numbers on hover
   return (
     <div
       className="no-scrollbar"
@@ -222,6 +241,7 @@ export default function AgentTicketAgeTable({
                     textAlign: 'center'
                   }}
                 >
+                  {/* Serial number starting from 1 */}
                   {rowIndex + 1}
                 </td>
                 <td
@@ -229,11 +249,13 @@ export default function AgentTicketAgeTable({
                   onMouseEnter={() => setHoveredRowIndex(rowIndex)}
                   onMouseLeave={() => setHoveredRowIndex(null)}
                 >
+                  {/* Agent name */}
                   {row.name}
                 </td>
                 <td
                   style={hoveredRowIndex === rowIndex ? { ...cellStyle3DHovered, textAlign: 'center' } : { ...cellStyle3D, textAlign: 'center' }}
                 >
+                  {/* Total ticket count summing all statuses over all visible age columns */}
                   {visibleAgeColumns.reduce((sum, col) => (
                     sum +
                     countFromArray(row, col.ageProp, 'open') +
@@ -248,6 +270,7 @@ export default function AgentTicketAgeTable({
                     style={hoveredRowIndex === rowIndex ? { ...cellStyle3DHovered, textAlign: 'center' } : { ...cellStyle3D, textAlign: 'center' }}
                   >
                     {(statusKeys.length === 0 || (statusKeys.length === 1 && statusKeys[0] === "total")) ? (
+                      // Show combined count and tooltip for all statuses when no status filter or only "total" selected
                       <Tippy content={
                         (() => {
                           const open = aggregateTickets(row, col.ageProp, 'open');
@@ -268,6 +291,7 @@ export default function AgentTicketAgeTable({
                         </span>
                       </Tippy>
                     ) : (
+                      // Show separate mini boxes for each selected status with tooltip of ticket numbers
                       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                         {statusKeys.filter(status => status !== "total").map(status => {
                           const arr = aggregateTickets(row, col.ageProp, status);
