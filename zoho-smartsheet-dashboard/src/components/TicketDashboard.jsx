@@ -333,14 +333,15 @@ const filteredMembers =
         (m) =>
           Array.isArray(m.departmentIds) &&
           m.departmentIds.includes(dept.id) &&
-          (m.tickets?.open || 0) + (m.tickets?.hold || 0) + (m.tickets?.escalated || 0) + (m.tickets?.unassigned || 0) + (m.tickets?.inProgress || 0) >
-            0
+          // Only show agents with at least 1 ticket in this department
+          (m.departmentTicketCounts?.[dept.id] || 0) > 0
       )
       .map((m) => m.displayName || m.fullName || m.name || m.email || "Unknown")
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })); // <-- ADD THIS LINE
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   });
   return map;
 }, [departmentsList, membersData]);
+
 
 
   useEffect(() => {
@@ -466,13 +467,13 @@ const filteredMembers =
       setCurrentDeptPage(1);
     }
   }, [selectedDepartments, currentDeptPage]);
-  const departmentBgColors = [
-    "linear-gradient(135deg, #6a80ff 30%, #8edeff 100%)",
-    "linear-gradient(135deg, #d5ff80 30%, #ffc164 100%)",
-    "linear-gradient(135deg, #ffb1b1 30%, #d592ff 100%)",
-    "linear-gradient(135deg, #6ef9a0 30%, #58d6ff 100%)",
-    "linear-gradient(135deg, #ffe298 30%, #ff8e91 100%)",
-  ];
+  // const departmentBgColors = [
+  //   "linear-gradient(135deg, #6a80ff 30%, #8edeff 100%)",
+  //   "linear-gradient(135deg, #d5ff80 30%, #ffc164 100%)",
+  //   "linear-gradient(135deg, #ffb1b1 30%, #d592ff 100%)",
+  //   "linear-gradient(135deg, #6ef9a0 30%, #58d6ff 100%)",
+  //   "linear-gradient(135deg, #ffe298 30%, #ff8e91 100%)",
+  // ];
 //   const departmentBgColors = [
 //   "linear-gradient(135deg, #283f74 30%, #181c31 100%)",    // Deep blue to almost black
 //   "linear-gradient(135deg, #1c232c 30%, #343c47 100%)",    // Slate/dark grey gradient
@@ -481,113 +482,118 @@ const filteredMembers =
 //   "linear-gradient(135deg, #121526 30%, #243159 100%)",    // Black-blue steel
 // ];
 
+const departmentBgColors = [
+  "linear-gradient(135deg, #132344ff 0%, #132344ff 50%, #0d172d 100%)",   // Navy blue - royal blue - midnight blue
+  // "linear-gradient(135deg, #1b2a49 0%, #223a6b 50%, #0d172d 100%)",   // Deep cobalt - steel blue - dark navy
+  // "linear-gradient(135deg, #1b2a49 0%, #223a6b 50%, #0d172d 100%)",   // Dark sapphire - blue-gray - black blue
+  //  "linear-gradient(135deg, #1b2a49 0%, #223a6b 50%, #0d172d 100%)",   // Prussian blue - slate blue - deep ocean
+  //  "linear-gradient(135deg, #1b2a49 0%, #223a6b 50%, #0d172d 100%)",   // Dark indigo - medium blue - near black
+];
+
   
-  const showLegendTotal = selectedStatuses.some((s) => s.value === "total");
-  const currentTicketNumber =
-    unassignedTicketNumbers.length > 0
-      ? unassignedTicketNumbers[currentUnassignedIndex].toString().padStart(5, "0")
-      : getStoredTicketNumber();
-//
-//
-  useEffect(() => {
-    let dataSource = rows;
-    if (selectedDepartments.length > 0) {
-      const allowedDeptIds = selectedDepartments.map((dep) => String(dep.value));
-      dataSource = membersData
-        .filter(
-          (member) =>
-            member.departmentIds && member.departmentIds.some((id) => allowedDeptIds.includes(id))
-        )
-        .map((member) => ({
-          cells: [
-            { columnId: ASSIGNEE_COL_ID, value: member.name },
-            { columnId: OPEN_STATUS_COL_ID, value: member.tickets.open?.toString() || "0" },
-            { columnId: HOLD_STATUS_COL_ID, value: member.tickets.hold?.toString() || "0" },
-            { columnId: ESCALATED_STATUS_COL_ID, value: member.tickets.escalated?.toString() || "0" },
-            { columnId: UNASSIGNED_STATUS_COL_ID, value: member.tickets.unassigned?.toString() || "0" },
-            { columnId: IN_PROGRESS_STATUS_COL_ID, value: member.tickets.inProgress?.toString() || "0" },
-          ],
-          departmentIds: member.departmentIds || [],
-          latestUnassignedTicketId: member.latestUnassignedTicketId || null,
-          key:
-            (member.departmentIds ? member.departmentIds.join(",") : "no_department") +
-            "_" +
-            member.id,
-        }));
-    }
-    if (selectedCandidates.length > 0) {
-      const allowedNames = selectedCandidates.map((c) => c.value.trim().toLowerCase());
-      dataSource = dataSource.filter((row) =>
-        allowedNames.includes(row.cells.find((c) => c.columnId === ASSIGNEE_COL_ID)?.value?.trim().toLowerCase())
-      );
-    }
-    const filteredCandidatesArr = dataSource.map((row) => {
-      const cells = Array.isArray(row.cells) ? row.cells : [];
-      return [
-        cells.find((c) => c.columnId === ASSIGNEE_COL_ID)?.value,
-        {
-          open: Number(cells.find((c) => c.columnId === OPEN_STATUS_COL_ID)?.value || 0),
-          hold: Number(cells.find((c) => c.columnId === HOLD_STATUS_COL_ID)?.value || 0),
-          escalated: Number(cells.find((c) => c.columnId === ESCALATED_STATUS_COL_ID)?.value || 0),
-          unassigned: Number(cells.find((c) => c.columnId === UNASSIGNED_STATUS_COL_ID)?.value || 0),
-          inProgress: Number(cells.find((c) => c.columnId === IN_PROGRESS_STATUS_COL_ID)?.value || 0),
-          latestUnassignedTicketId: row.latestUnassignedTicketId || null,
-        },
-      ];
-    });
-    setFilteredCandidates(filteredCandidatesArr);
+const showLegendTotal = selectedStatuses.some((s) => s.value === "total");
+const currentTicketNumber =
+  unassignedTicketNumbers.length > 0
+    ? unassignedTicketNumbers[currentUnassignedIndex].toString().padStart(5, "0")
+    : getStoredTicketNumber();
 
-    const sorted = [...filteredCandidatesArr].sort((a, b) => {
-      if (a[0] < b[0]) return sortOrder === "asc" ? -1 : 1;
-      if (a[0] > b[0]) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-    const nonZero = sorted.filter(([_, c]) => c.open > 0 || c.hold > 0 || c.escalated > 0 || c.unassigned > 0 || c.inProgress > 0);
+useEffect(() => {
+  let dataSource = rows;
+  if (selectedDepartments.length > 0) {
+    const allowedDeptIds = selectedDepartments.map((dep) => String(dep.value));
+    dataSource = membersData
+      .filter(
+        (member) =>
+          member.departmentIds && member.departmentIds.some((id) => allowedDeptIds.includes(id))
+      )
+      .map((member) => ({
+        cells: [
+          { columnId: ASSIGNEE_COL_ID, value: member.name },
+          { columnId: OPEN_STATUS_COL_ID, value: member.tickets.open?.toString() || "0" },
+          { columnId: HOLD_STATUS_COL_ID, value: member.tickets.hold?.toString() || "0" },
+          { columnId: ESCALATED_STATUS_COL_ID, value: member.tickets.escalated?.toString() || "0" },
+          { columnId: UNASSIGNED_STATUS_COL_ID, value: member.tickets.unassigned?.toString() || "0" },
+          { columnId: IN_PROGRESS_STATUS_COL_ID, value: member.tickets.inProgress?.toString() || "0" },
+        ],
+        departmentIds: member.departmentIds || [],
+        latestUnassignedTicketId: member.latestUnassignedTicketId || null,
+        key:
+          (member.departmentIds ? member.departmentIds.join(",") : "no_department") +
+          "_" +
+          member.id,
+      }));
+  }
+  if (selectedCandidates.length > 0) {
+    const allowedNames = selectedCandidates.map((c) => c.value.trim().toLowerCase());
+    dataSource = dataSource.filter((row) =>
+      allowedNames.includes(row.cells.find((c) => c.columnId === ASSIGNEE_COL_ID)?.value?.trim().toLowerCase())
+    );
+  }
+  const filteredCandidatesArr = dataSource.map((row) => {
+    const cells = Array.isArray(row.cells) ? row.cells : [];
+    return [
+      cells.find((c) => c.columnId === ASSIGNEE_COL_ID)?.value,
+      {
+        open: Number(cells.find((c) => c.columnId === OPEN_STATUS_COL_ID)?.value || 0),
+        hold: Number(cells.find((c) => c.columnId === HOLD_STATUS_COL_ID)?.value || 0),
+        escalated: Number(cells.find((c) => c.columnId === ESCALATED_STATUS_COL_ID)?.value || 0),
+        unassigned: Number(cells.find((c) => c.columnId === UNASSIGNED_STATUS_COL_ID)?.value || 0),
+        inProgress: Number(cells.find((c) => c.columnId === IN_PROGRESS_STATUS_COL_ID)?.value || 0),
+        latestUnassignedTicketId: row.latestUnassignedTicketId || null,
+      },
+    ];
+  });
+  setFilteredCandidates(filteredCandidatesArr);
 
-    const totalPages = Math.ceil(nonZero.length / CANDIDATES_PER_PAGE);
-    if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
-    const start = (currentPage - 1) * CANDIDATES_PER_PAGE;
-    const end = Math.min(start + CANDIDATES_PER_PAGE, nonZero.length);
+  const sorted = [...filteredCandidatesArr].sort((a, b) => {
+    if (a[0] < b[0]) return sortOrder === "asc" ? -1 : 1;
+    if (a[0] > b[0]) return sortOrder === "asc" ? 1 : -1;
+    return 0;
+  });
+  const nonZero = sorted.filter(([_, c]) => c.open > 0 || c.hold > 0 || c.escalated > 0 || c.unassigned > 0 || c.inProgress > 0);
 
-    const tempCells = [];
-    for (let i = start; i < end; i++) {
-      const [candidate, counts] = nonZero[i];
-      tempCells.push(
-        <div key={candidate} className="grid-cell" style={{ animationDelay: `${(i - start) * 65}ms` }}>
-          <div className="candidate-name">{candidate}</div>
-          <div className="ticket-counts" style={{ justifyContent: "center", display: "flex", gap: 10 }}>
-            {(selectedStatuses.length === 0 || (selectedStatuses.length === 1 && selectedStatusKeys.includes("total"))) ? (
-              <div className="count-box total">
-                {(counts.open || 0) + (counts.hold || 0) + (counts.inProgress || 0) + (counts.escalated || 0) + (counts.unassigned || 0)}
-              </div>
-            ) : (
-       selectedStatusKeys
-  .filter((k) => k !== "total")
-  .map((key) => (
-    <div className={`agent-status-box ${key.toLowerCase()}`} key={key}>
-      {counts[key] ?? 0}
-    </div>
+  const totalPages = Math.ceil(nonZero.length / CANDIDATES_PER_PAGE);
+  if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
+  const start = (currentPage - 1) * CANDIDATES_PER_PAGE;
+  const end = Math.min(start + CANDIDATES_PER_PAGE, nonZero.length);
 
-  ))
-
-            )}
-          </div>
+  const tempCells = [];
+  for (let i = start; i < end; i++) {
+    const [candidate, counts] = nonZero[i];
+    tempCells.push(
+      <div key={candidate} className="grid-cell" style={{ animationDelay: `${(i - start) * 65}ms` }}>
+        <div className="candidate-name">{candidate}</div>
+        <div className="ticket-counts" style={{ justifyContent: "center", display: "flex", gap: 10 }}>
+          {(selectedStatuses.length === 0 || (selectedStatuses.length === 1 && selectedStatusKeys.includes("total"))) ? (
+            <div className="count-box total">
+              {(counts.open || 0) + (counts.hold || 0) + (counts.inProgress || 0) + (counts.escalated || 0) + (counts.unassigned || 0)}
+            </div>
+          ) : (
+            selectedStatusKeys
+              .filter((k) => k !== "total")
+              .map((key) => (
+                <div className={`agent-status-box ${key.toLowerCase()}`} key={key}>
+                  {counts[key] ?? 0}
+                </div>
+              ))
+          )}
         </div>
-      );
-    }
-    setGridCells(tempCells);
-  }, [
-    rows,
-    membersData,
-    departmentRows,
-    currentPage,
-    sortOrder,
-    selectedDepartments,
-    selectedCandidates,
-    selectedStatuses,
-  ]);
+      </div>
+    );
+  }
+  setGridCells(tempCells);
+}, [
+  rows,
+  membersData,
+  departmentRows,
+  currentPage,
+  sortOrder,
+  selectedDepartments,
+  selectedCandidates,
+  selectedStatuses,
+]);
 
- let departmentGrids = null;
+let departmentGrids = null;
 if (selectedDepartments.length > 0 && currentDepartments.length > 0) {
   departmentGrids = (
     <>
@@ -654,56 +660,68 @@ if (selectedDepartments.length > 0 && currentDepartments.length > 0) {
             const allDepartmentMemberNames = departmentAgentWithTicketsMap[allowedDeptId] || [];
             const uniqueAgentsMap = new Map();
 
-           // For each agent in departmentMembersRows, always set all per-status fields
-departmentMembersRows.forEach((agent) => {
+            // For each agent in departmentMembersRows, always set all per-status fields
+            departmentMembersRows.forEach((agent) => {
   const normalizedName = agent.name.trim().toLowerCase();
   const totalTickets =
-    (agent.tickets?.open || 0) +
-    (agent.tickets?.hold || 0) +
-    (agent.tickets?.escalated || 0) +
-    (agent.tickets?.unassigned || 0) +
-    (agent.tickets?.inProgress || 0);
+    (agent.departmentTicketCounts && agent.departmentTicketCounts[allowedDeptId]) || 0;
+  // NEW: Use department-scoped per-status counts, fallback to 0
+  const deptAging =
+    (agent.departmentAgingCounts && agent.departmentAgingCounts[allowedDeptId]) || {};
 
-  // Always save with status fields (whether new or overwriting)
-  uniqueAgentsMap.set(normalizedName, {
-    id: agent.id,
-    name: agent.name.trim(),
-    open: agent.tickets?.open || 0,
-    hold: agent.tickets?.hold || 0,
-    inProgress: agent.tickets?.inProgress || 0,
-    escalated: agent.tickets?.escalated || 0,
-    unassigned: agent.tickets?.unassigned || 0,
-    totalTickets: totalTickets,
-  });
+ uniqueAgentsMap.set(normalizedName, {
+  id: agent.id,
+  name: agent.name.trim(),
+  open:
+    (deptAging.openBetweenOneAndFifteenDaysTickets?.length || 0) +
+    (deptAging.openBetweenSixteenAndThirtyDaysTickets?.length || 0) +
+    (deptAging.openOlderThanThirtyDaysTickets?.length || 0),
+  hold:
+    (deptAging.holdBetweenOneAndFifteenDaysTickets?.length || 0) +
+    (deptAging.holdBetweenSixteenAndThirtyDaysTickets?.length || 0) +
+    (deptAging.holdOlderThanThirtyDaysTickets?.length || 0),
+  inProgress:
+    (deptAging.inProgressBetweenOneAndFifteenDaysTickets?.length || 0) +
+    (deptAging.inProgressBetweenSixteenAndThirtyDaysTickets?.length || 0) +
+    (deptAging.inProgressOlderThanThirtyDaysTickets?.length || 0),
+  escalated:
+    (deptAging.escalatedBetweenOneAndFifteenDaysTickets?.length || 0) +
+    (deptAging.escalatedBetweenSixteenAndThirtyDaysTickets?.length || 0) +
+    (deptAging.escalatedOlderThanThirtyDaysTickets?.length || 0),
+  unassigned: agent.tickets?.unassigned || 0,
+  totalTickets: totalTickets,
 });
 
-// For fallback department names, add only if not already present
-allDepartmentMemberNames.forEach((name) => {
-  const normalizedName = name.trim().toLowerCase();
-  if (!uniqueAgentsMap.has(normalizedName)) {
-    uniqueAgentsMap.set(normalizedName, {
-      id: null,
-      name: name.trim(),
-      open: 0,
-      hold: 0,
-      inProgress: 0,
-      escalated: 0,
-      unassigned: 0,
-      totalTickets: 0,
-    });
-  }
 });
 
+
+            // For fallback department names, add only if not already present
+            allDepartmentMemberNames.forEach((name) => {
+              const normalizedName = name.trim().toLowerCase();
+              if (!uniqueAgentsMap.has(normalizedName)) {
+                uniqueAgentsMap.set(normalizedName, {
+                  id: null,
+                  name: name.trim(),
+                  open: 0,
+                  hold: 0,
+                  inProgress: 0,
+                  escalated: 0,
+                  unassigned: 0,
+                  totalTickets: 0,
+                });
+              }
+            });
 
             const deptSelectedAgents = selectedDeptAgents[allowedDeptId] || [];
-            const agentsToShow =
-              deptSelectedAgents.length > 0
-                ? Array.from(uniqueAgentsMap.values()).filter(agent =>
-                    deptSelectedAgents.includes(agent.name)
-                  )
-                : Array.from(uniqueAgentsMap.values()).filter(agent => agent.totalTickets > 0);
+const agentsToShow =
+  deptSelectedAgents.length > 0
+    ? Array.from(uniqueAgentsMap.values()).filter(agent =>
+        deptSelectedAgents.includes(agent.name)
+      )
+    : Array.from(uniqueAgentsMap.values()).filter(agent => agent.totalTickets > 0);
 
-            // --- Alphabetical sorting added here ---
+
+            // Alphabetical sorting added here
             const sortedAgentsToShow = agentsToShow.slice().sort((a, b) =>
               a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
             );
@@ -758,88 +776,90 @@ allDepartmentMemberNames.forEach((name) => {
                     boxSizing: "border-box",
                   }}
                 >
-              {sortedAgentsToShow.map((agent, index) => (
-  <div
-    key={agent.id || `${dep.value}_${index}`}
-    style={{
-      background: "rgba(32, 50, 98, 0.96)",
-      borderRadius: 18,
-      boxShadow: "0 2px 12px #34495e36, inset 0 2px 8px #ffc80013",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      padding: "12px 8px",
-      border: "3px solid #4ea1eb",
-      minWidth: 180,
-      maxWidth: 220,
-      boxSizing: "border-box",
-    }}
-  >
-    <div
-      style={{
-        color: "#fff",
-        fontWeight: 700,
-        fontSize: 18,
-        textAlign: "center",
-        marginBottom: 6,
-        wordBreak: "break-word",
-        width: "100%",
-        minHeight: "48px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {agent.name}
-    </div>
-    {(selectedStatusKeys.includes("total") || selectedStatusKeys.length === 0) ? (
-      <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 900,
-            background: "#EF6724",
-            color: "White",
-            borderRadius: 9,
-            padding: "3px 15px",
-            minWidth: 36,
-            textAlign: "center",
-            display: "inline-block",
-            maxWidth: "90%",
-            boxSizing: "border-box"
-          }}
-        >
-          {agent.totalTickets}
-        </div>
-      </div>
-    ) : (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          // flexWrap: "wrap",
-          // gap: "2px",
-          justifyContent: "center",
-          alignItems: "center",
-          width: "100%",
-          boxSizing: "border-box",
-          marginTop: 8,
-          flexWrap: "nowrap"
-        }}
-      >
-        {selectedStatusKeys.filter(key => key !== "total").map((key) => (
-          <div
-            key={key}
-            className={`agent-status-box ${key.toLowerCase()}`} // This is critical for colored borders
-          >
-            {agent[key] ?? 0}
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-))}
-
+                  {sortedAgentsToShow.map((agent, index) => (
+                    <div
+                      key={agent.id || `${dep.value}_${index}`}
+                      style={{
+                        background: "#1e4489",
+                        borderRadius: 18,
+                        boxShadow: "0 2px 12px #34495e36, inset 0 2px 8px #ffc80013",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        padding: "12px 8px",
+                        border: "1px solid White",
+                        minWidth: 180,
+                        maxWidth: 220,
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: "white",
+                          fontWeight: 700,
+                          fontSize: 18,
+                          textAlign: "center",
+                          marginBottom: 6,
+                          wordBreak: "break-word",
+                          width: "100%",
+                          minHeight: "48px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {agent.name}
+                      </div>
+                      {(selectedStatusKeys.includes("total") || selectedStatusKeys.length === 0) ? (
+                        <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                          <div
+    style={{
+      background: "#204a99",    // Deep blue or your gradient
+      color: "white",
+      fontWeight: "bold",
+      fontSize: "2.5rem",
+      borderRadius: 12,
+      padding: "1px 0",        // Increase padding for height
+      minHeight: "10px",        // Match agent box height
+      width: "90%",             // Occupy most of the parent width
+      textAlign: "center",
+      border: "3px solid white",
+      boxShadow: "0 2px 12px #34495e36",
+      fontFamily: "'Poppins', sans-serif",
+      letterSpacing: 1,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
+    }}
+  >
+    {agent.totalTickets}
+  </div>
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "row",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            width: "100%",
+                            boxSizing: "border-box",
+                            marginTop: 8,
+                            flexWrap: "nowrap"
+                          }}
+                        >
+                          {selectedStatusKeys.filter(key => key !== "total").map((key) => (
+                            <div
+                              key={key}
+                              className={`agent-status-box ${key.toLowerCase()}`} // This is critical for colored borders
+                            >
+                              {agent[key] ?? 0}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -902,6 +922,7 @@ allDepartmentMemberNames.forEach((name) => {
   );
 }
 
+//part 3 ended
   return (
     <>
       <div
@@ -1067,10 +1088,10 @@ allDepartmentMemberNames.forEach((name) => {
                 className="legend-item total"
                 style={{
                   backgroundColor: "#ffd700",
-                  color: "#1e4489",
-                  fontWeight: 700,
+                  color: "white",
+                  fontWeight: 900,
                   borderRadius: 12,
-                  padding: "0 10px",
+                  // padding: "0 10px",
                   flex: 1,
                   textAlign: "center",
                   fontSize: 20,
@@ -1186,72 +1207,74 @@ allDepartmentMemberNames.forEach((name) => {
                 </button>
 
                 {showTimeDropdown && (
-  <div
-    style={{
-      position: "absolute",
-      width: "100%",
-      height: 150,
-      fontSize: 12,
-      top: 50,
-      left: 0,
-      minWidth: 100,
-      background: "#dbdee7ff",
-      color: "black",
-      borderRadius: 18,
-      border: "1px solid #1e4489",
-      zIndex: 8,
-      padding: "10px"
-    }}
-    tabIndex={-1}
-    onMouseDown={e => e.preventDefault()} // keep open on click
-  >
-    <label style={{ display: "flex", alignItems: "center", padding: "5px 0", cursor: "pointer" }}>
-  <input
-    type="checkbox"
-    checked={selectedAges.includes("thirteenDays")}
-    onChange={e => {
-      setSelectedAges(prev =>
-        e.target.checked
-          ? [...prev, "thirteenDays"]
-          : prev.filter(v => v !== "thirteenDays")
-      );
-    }}
-    style={{ marginRight: 8 }}
-  />
-  1 - 13 Days Tickets
-</label>
+<div
+  style={{
+    position: "absolute",
+    width: "100%",
+    height: 150,
+    fontSize: 12,
+    top: 50,
+    left: 0,
+    minWidth: 100,
+    background: "#dbdee7ff",
+    color: "black",
+    borderRadius: 18,
+    border: "1px solid #1e4489",
+    zIndex: 8,
+    padding: "10px"
+  }}
+  tabIndex={-1}
+  onMouseDown={e => e.preventDefault()} // keep open on click
+>
+  <label style={{ display: "flex", alignItems: "center", padding: "5px 0", cursor: "pointer" }}>
+    <input
+      type="checkbox"
+      checked={selectedAges.includes("fifteenDays")}
+      onChange={e => {
+        setSelectedAges(prev =>
+          e.target.checked
+            ? [...prev, "fifteenDays"]
+            : prev.filter(v => v !== "fifteenDays")
+        );
+      }}
+      style={{ marginRight: 8 }}
+    />
+    1 - 15 Days Tickets
+  </label>
 
-    <label style={{ display: "flex", alignItems: "center", padding: "5px 0", cursor: "pointer" }}>
-      <input
-        type="checkbox"
-        checked={selectedAges.includes("twoWeeks")}
-        onChange={e => {
-          setSelectedAges(prev =>
-            e.target.checked
-              ? [...prev, "twoWeeks"]
-              : prev.filter(v => v !== "twoWeeks")
-          );
-        }}
-        style={{ marginRight: 8 }}
-      />
-      14 - 30 Days Tickets
-    </label>
-    <label style={{ display: "flex", alignItems: "center", padding: "5px 0", cursor: "pointer" }}>
-      <input
-        type="checkbox"
-        checked={selectedAges.includes("month")}
-        onChange={e => {
-          setSelectedAges(prev =>
-            e.target.checked
-              ? [...prev, "month"]
-              : prev.filter(v => v !== "month")
-          );
-        }}
-        style={{ marginRight: 8 }}
-      />
-      30+ Days Tickets
-    </label>
-  </div>
+  <label style={{ display: "flex", alignItems: "center", padding: "5px 0", cursor: "pointer" }}>
+    <input
+      type="checkbox"
+      checked={selectedAges.includes("sixteenToThirty")}
+      onChange={e => {
+        setSelectedAges(prev =>
+          e.target.checked
+            ? [...prev, "sixteenToThirty"]
+            : prev.filter(v => v !== "sixteenToThirty")
+        );
+      }}
+      style={{ marginRight: 8 }}
+    />
+    16 - 30 Days Tickets
+  </label>
+
+  <label style={{ display: "flex", alignItems: "center", padding: "5px 0", cursor: "pointer" }}>
+    <input
+      type="checkbox"
+      checked={selectedAges.includes("month")}
+      onChange={e => {
+        setSelectedAges(prev =>
+          e.target.checked
+            ? [...prev, "month"]
+            : prev.filter(v => v !== "month")
+        );
+      }}
+      style={{ marginRight: 8 }}
+    />
+    30+ Days Tickets
+  </label>
+</div>
+
 )}
 
                 
@@ -1287,13 +1310,18 @@ allDepartmentMemberNames.forEach((name) => {
         </div>
         
            {selectedAges.length > 0 ? (
-      <AgentTicketAgeTable
-        membersData={filteredMembers}
-        selectedAges={selectedAges}
-        selectedStatuses={selectedStatuses}
-        onClose={() => setSelectedAges([])}
-        showTimeDropdown={showTimeDropdown}
-      />
+     <AgentTicketAgeTable
+  membersData={filteredMembers}
+  selectedAges={selectedAges}
+  selectedStatuses={selectedStatuses}
+  onClose={() => setSelectedAges([])}
+  showTimeDropdown={showTimeDropdown}
+  selectedDepartmentId={currentDepartments && currentDepartments[0]?.value} // or your correct variable!
+  selectedAgentNames={
+    currentDepartments && selectedDeptAgents[currentDepartments[0]?.value] || []
+  }
+/>
+
     ) : (
       departmentGrids
     )}

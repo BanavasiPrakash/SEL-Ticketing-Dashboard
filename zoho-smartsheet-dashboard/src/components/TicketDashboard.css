@@ -333,22 +333,22 @@
   } */
 
   @keyframes glowShadow {
-  /* 0%, 100% {
-    box-shadow: */
-      /* 3px 3px 3px rgba(204, 0, 255, 0.7),      
-      -3px -3px 3px rgba(0, 255, 255, 0.6),     */
-      /* inset 1px 1px 4px #f3f3f5, 
-      inset -1px -1px 4px #f3f3f5, 
-      0 0 4px #1e4489;          */
-  /* } */
-  /* 50% {
-    box-shadow: */
-      /* 2px 2px 2px rgba(0, 255, 255, 0.8),     
-      -4px -4px 2px rgba(255, 50, 220, 0.9),   */
-      /* inset 1px 1px 4px #f3f4f5,
-      inset -1px -1px 4px #f3f3f5, 
-      0 0 4px #1e4489;          */
-  /* } */
+  0%, 100% {
+    box-shadow: 
+      3px 3px 3px #1e4489,      
+      -3px -3px 3px #1e4489,     
+      inset 1px 1px 4px #1e4489, 
+      inset -1px -1px 4px #1e4489, 
+      0 0 4px #1e4489;         
+  }
+  50% {
+    box-shadow: 
+      2px 2px 2px #1e4489,     
+      -4px -4px 2px #1e4489,   
+      inset 1px 1px 4px #1e4489,
+      inset -1px -1px 4px #1e4489, 
+      0 0 4px #1e4489;          
+   } 
 }
 
 .open {
@@ -846,3 +846,19 @@ button.time-dropdown::after {
 }
 
 
+
+.no-scrollbar {
+  scrollbar-width: thin;       /* For Firefox: thin scrollbar */
+  scrollbar-color: #292828 black;   /* Firefox thumb and track */
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 1px;                  /* Chrome, Edge, Safari, Opera */
+}
+.no-scrollbar::-webkit-scrollbar-thumb {
+  background: #2c2c2c;
+  border-radius: 10px;
+}
+.no-scrollbar::-webkit-scrollbar-track {
+  background: #2c2c2c;
+  /* background: #f8f8f8; */
+}

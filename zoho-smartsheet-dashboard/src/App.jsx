@@ -1,10 +1,10 @@
-import React from "react";
-import CombinedDashboard from "./components/CombinedDashboard";
+import React from 'react';
+import TicketDashboard from './components/TicketDashboard';
 
 function App() {
   return (
     <div className="App">
-      <CombinedDashboard />
+      <TicketDashboard />
     </div>
   );
 }
